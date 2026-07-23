@@ -1,6 +1,7 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from typing import Optional
 
 app = FastAPI(title="Task API", version="1.0")
 
@@ -14,6 +15,11 @@ next_id = 4
 
 class TaskCreate(BaseModel):
     title: str = ""
+
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    done: Optional[bool] = None
 
 
 @app.exception_handler(HTTPException)
@@ -38,12 +44,19 @@ def list_tasks():
     return tasks
 
 
-@app.get("/tasks/{task_id}", tags=["tasks"], summary="Get a single task by id")
-def get_task(task_id: int):
+def find_task(task_id: int):
     for task in tasks:
         if task["id"] == task_id:
             return task
-    raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+    return None
+
+
+@app.get("/tasks/{task_id}", tags=["tasks"], summary="Get a single task by id")
+def get_task(task_id: int):
+    task = find_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+    return task
 
 
 @app.post("/tasks", status_code=201, tags=["tasks"], summary="Create a task")
@@ -56,3 +69,30 @@ def create_task(payload: TaskCreate):
     tasks.append(task)
     next_id += 1
     return task
+
+
+@app.put("/tasks/{task_id}", tags=["tasks"], summary="Update a task")
+def update_task(task_id: int, payload: TaskUpdate):
+    task = find_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+
+    if payload.title is None and payload.done is None:
+        raise HTTPException(status_code=400, detail="provide at least one of: title, done")
+    if payload.title is not None:
+        title = payload.title.strip()
+        if not title:
+            raise HTTPException(status_code=400, detail="title cannot be empty")
+        task["title"] = title
+    if payload.done is not None:
+        task["done"] = payload.done
+    return task
+
+
+@app.delete("/tasks/{task_id}", status_code=204, tags=["tasks"], summary="Delete a task")
+def delete_task(task_id: int):
+    task = find_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+    tasks.remove(task)
+    return Response(status_code=204)
