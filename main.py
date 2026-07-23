@@ -3,7 +3,11 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 
-app = FastAPI(title="Task API", version="1.0")
+app = FastAPI(
+    title="Task API",
+    version="1.0",
+    description="A small in-memory to-do list API — full CRUD over tasks.",
+)
 
 tasks = [
     {"id": 1, "title": "Buy milk", "done": False},
