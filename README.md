@@ -55,6 +55,7 @@ content-type: application/json
 above shows up there with a **Try it out** button that fires real requests,
 no `curl` needed.
 
+![/docs](Screenshots/swagger_ui.png)
 *(screenshot of `/docs` goes here)*
 
 ## Notes on state
