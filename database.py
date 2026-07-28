@@ -146,3 +146,44 @@ def create_task(task: TaskCreate):
         "title": task.title,
         "done": False,
     }
+
+
+# ----------------------------
+# UPDATE TASK
+# ----------------------------
+
+@app.put("/tasks/{task_id}")
+def update_task(task_id: int, task: TaskUpdate):
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT * FROM tasks WHERE id=?",
+        (task_id,),
+    )
+
+    if cursor.fetchone() is None:
+        conn.close()
+        raise HTTPException(
+            status_code=404,
+            detail="Task not found",
+        )
+
+    cursor.execute(
+        """
+        UPDATE tasks
+        SET title=?, done=?
+        WHERE id=?
+        """,
+        (task.title, task.done, task_id),
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "id": task_id,
+        "title": task.title,
+        "done": task.done,
+    }
