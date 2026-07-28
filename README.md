@@ -65,3 +65,142 @@ the server resets the task list back to the three seed tasks; anything
 created, updated, or deleted during a session is lost. That's the
 trade-off of Stage 0–6: it's the simplest possible storage, and it's why a
 real backend eventually needs a persistent database.
+
+
+
+
+# Task API — Week 2 · Assignment 2
+
+A lightweight REST API for managing tasks, built with **FastAPI** and backed by **SQLite**. This project replaces the in-memory storage from Assignment 1 with a real database, demonstrating that persistence is an implementation detail — the API itself stays exactly the same.
+
+---
+
+## Why SQLite was chosen
+
+SQLite was chosen because it is a **zero-configuration, serverless database** that stores all data in a single file. This makes it ideal for learning and small projects:
+
+- No separate database server to install or run
+- The database file (`tasks.db`) is created automatically on first run
+- Data survives server restarts
+- Moving to PostgreSQL or MySQL later only requires changing the connection layer — the SQL queries and API remain largely identical
+
+---
+
+## Database file location
+
+The database file is stored in the project root:
+
+```
+project-root/
+├── main.py
+├── database.py
+├── requirements.txt
+├── README.md
+└── tasks.db          ← SQLite database file (auto-created)
+```
+
+> **Note:** `tasks.db` is created automatically when you start the server for the first time. You do not need to create it manually.
+
+---
+
+## How to start the project
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/nafisrahman006/task-api.git
+cd YOUR_REPO_NAME
+```
+
+### 2. Create a virtual environment (optional but recommended)
+
+```bash
+python -m venv venv
+
+# macOS / Linux
+source venv/bin/activate
+
+# Windows
+venv\Scripts\activate
+```
+
+### 3. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Run the server
+
+```bash
+uvicorn database:app --reload
+```
+
+The API will be available at `http://127.0.0.1:8000`.
+
+Interactive documentation (Swagger UI) is available at:
+
+```
+http://127.0.0.1:8000/docs
+```
+
+---
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/` | API info |
+| GET | `/health` | Health check |
+| GET | `/tasks` | List all tasks (supports search, filter, sort) |
+| GET | `/tasks/{id}` | Get a single task |
+| POST | `/tasks` | Create a new task |
+| PUT | `/tasks/{id}` | Update a task |
+| DELETE | `/tasks/{id}` | Delete a task |
+| GET | `/stats` | Return task statistics |
+
+### Query parameters for `GET /tasks`
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `search` | string | Search titles using SQL `LIKE` (e.g., `?search=milk`) |
+| `done` | boolean | Filter by status (`?done=true` or `?done=false`) |
+| `sort` | string | Sort alphabetically by title (`?sort=title`) |
+
+---
+
+## Example SQL queries executed
+
+During development, the database was explored directly using **DB Browser for SQLite**. Below is one example query:
+
+```sql
+-- Count all tasks
+SELECT COUNT(*) FROM tasks;
+```
+
+Other queries executed:
+
+```sql
+-- List every task
+SELECT * FROM tasks;
+
+-- Show only completed tasks
+SELECT * FROM tasks WHERE done = 1;
+
+-- Mark every task as completed
+UPDATE tasks SET done = 1;
+
+-- Delete all completed tasks
+DELETE FROM tasks WHERE done = 1;
+```
+
+Modifying the database manually through DB Browser and then calling the API immediately reflected those changes, confirming that the API reads directly from the database.
+
+---
+
+## Database viewer screenshot
+
+Below is a screenshot of the `tasks` table opened in **DB Browser for SQLite**:
+
+![Database Viewer Screenshot](Screenshots/sqlite.png)
+
