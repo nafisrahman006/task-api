@@ -1,24 +1,14 @@
-from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Query, Response
 from pydantic import BaseModel
 from typing import Optional
+from repository import TaskRepository
 
-app = FastAPI(
-    title="Task API",
-    version="1.0",
-    description="A small in-memory to-do list API — full CRUD over tasks.",
-)
-
-tasks = [
-    {"id": 1, "title": "Buy milk", "done": False},
-    {"id": 2, "title": "Write report", "done": True},
-    {"id": 3, "title": "Walk the dog", "done": False},
-]
-next_id = 4
+app = FastAPI(title="Task API")
+repo = TaskRepository()
 
 
 class TaskCreate(BaseModel):
-    title: str = ""
+    title: str
 
 
 class TaskUpdate(BaseModel):
@@ -26,77 +16,64 @@ class TaskUpdate(BaseModel):
     done: Optional[bool] = None
 
 
-@app.exception_handler(HTTPException)
-def http_error_handler(request: Request, exc: HTTPException):
-    return JSONResponse(status_code=exc.status_code, content={"error": exc.detail})
-
-
-@app.get("/", tags=["meta"], summary="API info")
+@app.get("/")
 def root():
-    """Describes this API and lists its main resource endpoints."""
     return {"name": "Task API", "version": "1.0", "endpoints": ["/tasks"]}
 
 
-@app.get("/health", tags=["meta"], summary="Liveness check")
+@app.get("/health")
 def health():
-    """Used by uptime checks / orchestrators to confirm the server is alive."""
     return {"status": "ok"}
 
 
-@app.get("/tasks", tags=["tasks"], summary="List all tasks")
-def list_tasks():
-    return tasks
+@app.get("/tasks")
+def get_tasks(
+    search: Optional[str] = Query(None, description="Search in title"),
+    done: Optional[bool] = Query(None, description="Filter by done status"),
+    sort: Optional[str] = Query(None, description="Use 'title' to sort alphabetically"),
+):
+    return repo.get_all(search=search, done=done, sort=sort)
 
 
-def find_task(task_id: int):
-    for task in tasks:
-        if task["id"] == task_id:
-            return task
-    return None
-
-
-@app.get("/tasks/{task_id}", tags=["tasks"], summary="Get a single task by id")
+@app.get("/tasks/{task_id}")
 def get_task(task_id: int):
-    task = find_task(task_id)
+    task = repo.get_by_id(task_id)
     if task is None:
-        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+        raise HTTPException(status_code=404, detail="Task not found")
     return task
 
 
-@app.post("/tasks", status_code=201, tags=["tasks"], summary="Create a task")
-def create_task(payload: TaskCreate):
-    global next_id
-    title = payload.title.strip()
-    if not title:
-        raise HTTPException(status_code=400, detail="title is required and cannot be empty")
-    task = {"id": next_id, "title": title, "done": False}
-    tasks.append(task)
-    next_id += 1
-    return task
+@app.get("/stats")
+def get_stats():
+    return repo.get_stats()
 
 
-@app.put("/tasks/{task_id}", tags=["tasks"], summary="Update a task")
-def update_task(task_id: int, payload: TaskUpdate):
-    task = find_task(task_id)
-    if task is None:
-        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
-
-    if payload.title is None and payload.done is None:
-        raise HTTPException(status_code=400, detail="provide at least one of: title, done")
-    if payload.title is not None:
-        title = payload.title.strip()
-        if not title:
-            raise HTTPException(status_code=400, detail="title cannot be empty")
-        task["title"] = title
-    if payload.done is not None:
-        task["done"] = payload.done
-    return task
+@app.post("/tasks", status_code=201)
+def create_task(task: TaskCreate):
+    if not task.title.strip():
+        raise HTTPException(status_code=400, detail="Title is required")
+    return repo.create(task.title)
 
 
-@app.delete("/tasks/{task_id}", status_code=204, tags=["tasks"], summary="Delete a task")
+@app.put("/tasks/{task_id}")
+def update_task(task_id: int, task: TaskUpdate):
+    if task.title is None and task.done is None:
+        raise HTTPException(status_code=400, detail="Provide at least one field to update")
+
+    existing = repo.get_by_id(task_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.title is not None and not task.title.strip():
+        raise HTTPException(status_code=400, detail="Title cannot be empty")
+
+    return repo.update(task_id, task.title, task.done)
+
+
+@app.delete("/tasks/{task_id}", status_code=204)
 def delete_task(task_id: int):
-    task = find_task(task_id)
-    if task is None:
-        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
-    tasks.remove(task)
+    existing = repo.get_by_id(task_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    repo.delete(task_id)
     return Response(status_code=204)
