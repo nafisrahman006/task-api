@@ -2,6 +2,10 @@ from fastapi import FastAPI, HTTPException, Query, Response
 from pydantic import BaseModel
 from typing import Optional
 from repository import TaskRepository
+import redis
+
+
+
 
 app = FastAPI(title="Task API")
 repo = TaskRepository()
@@ -15,6 +19,15 @@ class TaskUpdate(BaseModel):
     title: Optional[str] = None
     done: Optional[bool] = None
 
+@app.get("/redis", tags=["meta"], summary="Ping Redis")
+def ping_redis():
+    """Confirms the app can reach the Redis container."""
+    try:
+        r = redis.Redis(host="redis", port=6379, decode_responses=True)
+        r.ping()
+        return {"redis": "connected"}
+    except redis.ConnectionError:
+        raise HTTPException(status_code=503, detail="Redis unreachable")
 
 @app.get("/")
 def root():
